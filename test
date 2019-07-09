@@ -217,3 +217,10 @@ az vmss create \
   --image myImage02 \
   --admin-username azureuser03 \
   --generate-ssh-keys
+
+  [Ubuntu]
+  apt-get install apache2 php php-mysql
+  apt-get install mysql / mysqlserver
+  apt-cache search mysql-esrver
+  # apt-get install libapache2-mod-php7.0
+  
