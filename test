@@ -1,0 +1,219 @@
+terraform 생성
+
+application ID
+d8b362af-3d2e-4630-b9d2-dfb651f9f228
+Directory ID
+96e3cac9-1ab3-436b-9f79-2a0a4b687f1b
+
+group02key : coh3XF+LqlEmwZmkcG:WkiX:@C7z79NE
+
+subscription ID: e0fae348-f6c2-45f5-87b7-c41c22782d8f
+
+provider "azurerm" {
+    subscription_id = "e0fae348-f6c2-45f5-87b7-c41c22782d8f"
+    client_id       = "d8b362af-3d2e-4630-b9d2-dfb651f9f228"
+    client_secret   = "coh3XF+LqlEmwZmkcG:WkiX:@C7z79NE"
+    tenant_id       = "96e3cac9-1ab3-436b-9f79-2a0a4b687f1b"
+}
+
+resource "azurerm_resource_group" "myterraformgroup" {
+    name     = "group02-RG"
+    location = "koreacentral"
+
+    tags = {
+        environment = "Terraform Demo02"
+    }
+}
+
+resource "azurerm_resource_group" "myterraformgroup" {
+    name     = "group02-RG"
+    location = "koreacentral"
+
+    tags {
+        environment = "Terraform Demo02"
+    }
+}
+
+myVnet.tf
+resource "azurerm_virtual_network" "myterraformnetwork" {
+    name                = "myVnet"
+    address_space       = ["2.0.0.0/16"]
+    location            = "koreacentral"
+    resource_group_name = "${azurerm_resource_group.myterraformgroup.name}"
+
+    tags = {
+        environment = "Terraform Demo02"
+    }
+}
+
+resource "azurerm_subnet" "myterraformsubnet" {
+    name                 = "mySubnet1"
+    resource_group_name  = "${azurerm_resource_group.myterraformgroup.name}"
+    virtual_network_name = "${azurerm_virtual_network.myterraformnetwork.name}"
+    address_prefix       = "2.0.1.0/24"
+}
+
+resource "azurerm_public_ip" "myterraformpublicip" {
+    name                         = "myPublicIP"
+    location                     = "koreacentral"
+    resource_group_name          = "${azurerm_resource_group.myterraformgroup.name}"
+    allocation_method            = "Dynamic"
+
+    tags = {
+        environment = "Terraform Demo02"
+    }
+}
+
+resource "azurerm_network_security_group" "myterraformnsg" {
+    name                = "group02-sg"
+    location            = "koreacentral"
+    resource_group_name = "${azurerm_resource_group.myterraformgroup.name}"
+    
+    security_rule {
+        name                       = "SSH"
+        priority                   = 1001
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "Tcp"
+        source_port_range          = "*"
+        destination_port_range     = "22"
+        source_address_prefix      = "*"
+        destination_address_prefix = "*"
+    }
+
+    tags = {
+        environment = "Terraform Demo02"
+    }
+}
+
+resource "azurerm_network_security_group" "myterraformnsg" {
+    name                = "group02-sg"
+    location            = "koreacentral"
+    resource_group_name = "${azurerm_resource_group.myterraformgroup.name}"
+    
+    security_rule {
+        name                       = "SSH"
+        priority                   = 1001
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "Tcp"
+        source_port_range          = "*"
+        destination_port_range     = "22"
+        source_address_prefix      = "*"
+        destination_address_prefix = "*"
+    }
+	security_rule {
+        name                       = “HTTP”
+        priority                   = 2001
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "Tcp"
+        source_port_range          = "*"
+        destination_port_range     = “80"
+        source_address_prefix      = "*"
+        destination_address_prefix = "*"
+    }
+
+    tags = {
+        environment = "Terraform Demo"
+    }
+}
+
+resource "azurerm_network_interface" "myterraformnic" {
+    name                = "myNIC"
+    location            = "koreacentral"
+    resource_group_name = "${azurerm_resource_group.myterraformgroup.name}"
+    network_security_group_id = "${azurerm_network_security_group.myterraformnsg.id}"
+
+    ip_configuration {
+        name                          = "group02-NIC"
+        subnet_id                     = "${azurerm_subnet.myterraformsubnet.id}"
+        private_ip_address_allocation = "Dynamic"
+        public_ip_address_id          = "${azurerm_public_ip.myterraformpublicip.id}"
+    }
+
+    tags {
+        environment = "Terraform Demo02"
+    }
+}
+
+resource "azurerm_storage_account" "mystorageaccount" {
+    name                = "diag${random_id.randomId.hex}"
+    resource_group_name = "${azurerm_resource_group.myterraformgroup.name}"
+    location            = "koreacentral"
+    account_replication_type = "LRS"
+    account_tier = "Standard"
+
+    tags = {
+        environment = "Terraform Demo02"
+    }
+}
+
+resource "azurerm_virtual_machine" "myterraformvm" {
+    name                  = "group02-VM"
+    location              = "koreacentral"
+    resource_group_name   = "${azurerm_resource_group.myterraformgroup.name}"
+    network_interface_ids = ["${azurerm_network_interface.myterraformnic.id}"]
+    vm_size               = "Standard_DS1_v2"
+
+    storage_os_disk {
+        name              = "myOsDisk"
+        caching           = "ReadWrite"
+        create_option     = "FromImage"
+        managed_disk_type = "Premium_LRS"
+    }
+    storage_image_reference {
+        publisher = "Canonical"
+        offer     = "UbuntuServer"
+        sku       = "16.04.0-LTS"
+        version   = "latest"
+    }
+
+	os_profile {
+        computer_name  = "group02-VM"
+        admin_username = "azureuser03"
+        admin_password = "SKCNC!23"
+    }
+
+	os_profile_linux_config {
+        disable_password_authentication = true
+        ssh_keys {
+            path     = "/home/azureuser03/.ssh/authorized_keys"
+            key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+H767/EE0nkJYIMNcB99++pjzX1pTmy6a849bvEhfKosvBKRYrquRhOx7TsPm7NB5ujF51X30yvlsKpImfY7pRpYJiLMv8NTJD2YMJbVj7w9q6MatZ5zuMkevHlKcj2RQgQdf4J6TLGcE6iVPrv6Lbi1zO5TlwpJuNQMITnME98c1HNVh0Kush7RqZxU7OJnqaEBstFh6/JCWATHcWfC/tAC/2V1sgc7H7b5ca+jbLCbAa61KisbCQ1JPTNV1++EX3NDqj5fTjYex0O7fmTmwu1yPvj7/+MOSVFEzN8upILVZoZ4W7GvlTK/JCoEzCZZnfnQFHfJexb8dwv2j8RYl user03@cc-1dd2e937-6b6695c8b6-rch7q"
+        }
+    }
+    boot_diagnostics {
+        enabled     = "true"
+        storage_uri = "${azurerm_storage_account.mystorageaccount.primary_blob_endpoint}"
+    }
+
+    tags = {
+        environment = "Terraform Demo02"
+    }
+}
+
+az mysql server create --resource-group group02-RG --name group02mysql --location "koreacentral" --admin-user demouser --admin-password demo@pass123 --sku-name B_Gen5_2 --storage-size 51200 --ssl-enforcement Disabled
+
+az group create --name GROUP02-RG --location koreacentral
+
+az vm create \
+  --resource-group GROUP02-RG \
+  --name myVM \
+  --image ubuntults \
+  --admin-username azureuser03 \
+  --generate-ssh-keys
+  
+az vm deallocate --resource-group GROUP02-RG --name group02-VM
+az vm generalize --resource-group GROUP02-RG --name group02-VM
+
+az image create \
+  --resource-group GROUP02-RG \
+  --name myImage02 \
+  --source group02-VM
+  
+az vmss create \
+  --resource-group GROUP02-RG \
+  --name myScaleSet02 \
+  --image myImage02 \
+  --admin-username azureuser03 \
+  --generate-ssh-keys
